@@ -43,7 +43,10 @@ class DQNAgent:
         # by default, CartPole-v1 has max episode steps = 500
         self.state_size = self.env.observation_space.shape[0]
         self.action_size = self.env.action_space.n
-        self.EPISODES = 200
+        # print('meowmeowmow')
+        # print(self.state_size)
+        # print(self.action_size)
+        self.EPISODES = 5
         self.memory = deque(maxlen=2000)
 
         self.gamma = 0.95  # discount rate
@@ -51,7 +54,7 @@ class DQNAgent:
         self.epsilon_min = 0.001
         self.epsilon_decay = 0.999
         self.batch_size = 64
-        self.train_start = 1000
+        self.train_start = 100
 
         # create main model
         self.model = OurModel(input_shape=(self.state_size,), action_space=self.action_size)
@@ -70,6 +73,9 @@ class DQNAgent:
                         math.exp(-1. * len(self.memory) / self.epsilon_decay)
         if sample > eps_threshold:
             action_to_take = np.argmax(self.model.predict(state))
+            print('mew')
+            print(state)
+            print(self.model.predict(state))
             #print('selected optimal action')
             # ^ supposed to find the max reward in the list of past rewards for current state
             # then find what index it is, and then select the action from the max reward
