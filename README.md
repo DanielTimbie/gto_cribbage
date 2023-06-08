@@ -12,7 +12,7 @@ I will use deep Q-Learning methods to optimize for cribbage gameplay. I will mod
 
 The program has several relevant files for operation. A short description for each one follows, as well as some notes about what still needs to be done.
 
-# ceck_actions.py
+# deck_actions.py
 
 deck_actions.py defines all possible objects relevant to the game, including cards, hands, decks, and piles for the play phase. 'Card' objects have three attributes: value, suit, and a variable called 'isused' which is False by default but set to True if it has been played during the play phase, rendering it inelligible to be played again. 'Deck' objects consist of 52 cards, and are shuffled upon generation. Using 'shuffle', 'cut', 'draw', and 'deal' internal functions of 'Deck' one can perform those actions. 'Hand' begins with an empty list corresponding to its attribute 'hand', and 'isgo' determines whether or not the hand has defaulted to the other player during the play phase due to inability to play a card. 'Peg_pile' objects keep track of cards and scores during the play phase, and can be fed into the scoring function to get current scores. 
 

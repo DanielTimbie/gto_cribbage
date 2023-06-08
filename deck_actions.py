@@ -51,6 +51,29 @@ class Hand:
     def dealt(self,cards):
         self.hand = self.hand + cards
 
+    def order(self):
+        temphand = self.hand
+        new_order_vals = []
+        new_order = [temphand[0]]
+        new_order_vals = [temphand[0].value]
+        temphand = temphand[1:]
+        for i in temphand:
+            counter = 0 
+            for j in range(len(new_order)):
+                if i.value > new_order[j].value:
+                    counter += 1
+                if i.value > new_order[j].value and j + 1 == len(new_order):
+                    new_order.insert(counter, i)
+                    new_order_vals.insert(counter, i.value)
+                elif i.value <= new_order[j].value:
+                    new_order.insert(counter, i)
+                    new_order_vals.insert(counter, i.value)
+                    break
+        self.hand = new_order
+        
+
+
+
 class Peg_pile:
     def __init__(self):
         self.pile = []

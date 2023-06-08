@@ -30,14 +30,20 @@ def get_play_state(hand, cutcard, score, optscore, pile):
 
 def get_score_state(hand):
     #first eight for value, final four cribbed
-    state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    for i in range(0,4):
-        print(i)
-        state[2*i] = hand.hand[i].value
-        state[2*i+1] = hand.hand[i].suit
-    for i in range(0,2):
-        state[2*i + 8] = hand.cribbed[i].value
-        state[2*i + 9] = hand.cribbed[i].suit
+    state = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+    if hand.isdeal == True:
+        state[6] = [1, 1]
+    if hand.cribbed == []:
+        for i in range(0,6):
+            state[i][0] = hand.hand[i].value
+            state[i][1] = hand.hand[i].suit
+    else:
+        for i in range(0,4):
+            state[i][0] = hand.hand[i].value
+            state[i][1] = hand.hand[i].suit
+        for i in range(0,2):
+            state[i + 4][0] = hand.cribbed[i].value
+            state[i + 4][1] = hand.cribbed[i].suit
     return(state)
 
 # #-----------------------------------------------------------
@@ -54,13 +60,23 @@ P.playlast = 1
 H.dealt(D.deal(6))
 V.dealt(D.deal(6))
 
+print('player 1 hand:')
+print(get_score_state(H))
+print('player 2 hand:')
+print(get_score_state(V))
+
 #choosing which cards to discard
 C.dealt(random_discard_policy(H))
 C.dealt(random_discard_policy(V))
 
+print('player 1 hand after discarding:')
+print(get_score_state(H))
+print('player 2 hand after discarding:')
+print(get_score_state(V))
+
 cut_card = D.deal(1)
-#print('Cut Card:')
-#print(str(cut_card[0].value) + ' ' + cut_card[0].suit)
+print('Cut Card:')
+print(str(cut_card[0].value) + ' ' + str(cut_card[0].suit))
 if cut_card[0].value == 11:
     if H.isdeal == True:
         score += 1
@@ -76,8 +92,8 @@ while len(P.pile) < 8:
         if (H.isgo == False and P.playlast == 1) or (V.isgo == True and P.playlast == 0):
             #print(get_play_state(H, cut_card, score, opscore, P))            
             random_play_policy(H,P)
-            #print(get_play_state(H, cut_card, score, opscore, P))            
-            #print('score: ' + str(cribbage_scoring.score_peg(P)))
+            # print(get_play_state(H, cut_card, score, opscore, P))            
+            # print('score: ' + str(cribbage_scoring.score_peg(P)))
             score = score + cribbage_scoring.score_peg(P)
             P.playlast = 0
             if P.pileval == 31:
@@ -86,8 +102,8 @@ while len(P.pile) < 8:
         if (V.isgo == False and P.playlast == 0) or (H.isgo == True and P.playlast == 1):
             #print(get_play_state(V, cut_card, score, opscore, P))            
             random_play_policy(V,P) 
-            #print(get_play_state(V, cut_card, score, opscore, P))            
-            #print('score: ' + str(cribbage_scoring.score_peg(P)))
+            # print(get_play_state(V, cut_card, score, opscore, P))            
+            # print('score: ' + str(cribbage_scoring.score_peg(P)))
             opscore = opscore + cribbage_scoring.score_peg(P)
             P.playlast = 1
             if P.pileval == 31:
@@ -105,12 +121,18 @@ while len(P.pile) < 8:
     P.resetct = len(P.pile)
     H.isgo, V.isgo = False, False
 
+print('states indicating the results of the play phase')
+print(get_play_state(H, cut_card, score, opscore, P))            
+print(get_play_state(V, cut_card, score, opscore, P))            
+
 # #scoring the final hands
+
 
 opscore = opscore + cribbage_scoring.score_hand(V.hand + cut_card)
 score = score + cribbage_scoring.score_hand(H.hand + cut_card)
 score = score + cribbage_scoring.score_hand(C.hand + cut_card)
 
+print('final score:')
 print(str(score) + ', ' + str(opscore))
 
 # #-----------------------------------------------------------

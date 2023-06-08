@@ -17,6 +17,24 @@ from preset_policy import *
 #discard phase q-learning looks to pick which cards to discard while maximizing the player's score 
 #differential with the opponent. total scores are not taken into consideration. 
 
+# def hand_from_state(state):
+#     gen_hand = deck_actions.Hand()
+#     if state[6] == [1, 1]:
+#         gen_hand.isdeal = True
+#     for i in range(4):
+#         gen_hand.hand = gen_hand.hand + [deck_actions.Card(state[i][0], state[i][1])]
+#         #print(state[i][0], state[i][1])
+#     for i in range(2):
+#         gen_hand.cribbed = gen_hand.cribbed + [[deck_actions.Card(state[i + 4][0], state[i + 4][1])]]
+#         #print(state[i + 4][0], state[i + 4][1])
+#     return(gen_hand)
+
+# def state_unflatten(flat_state):
+#     state = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+#     for i in range(6):
+#         state[i] = [flat_state[2*i], flat_state[2*i + 1]]
+#     return(state)    
+
 #state with collapsed suit and value attributes
 def get_score_state(hand):
     #first eight for value, final four cribbed
@@ -40,7 +58,7 @@ def get_score_state_nosuit(hand):
     #temporary function for scoring
     state = [0, 0, 0, 0, 0, 0, 0]
     if hand.isdeal == True:
-        state[6] = 0
+        state[6] = 1
     if hand.cribbed == []:
         for i in range(0,6):
             state[i] = hand.hand[i].value
@@ -51,26 +69,8 @@ def get_score_state_nosuit(hand):
             state[i + 4] = hand.cribbed[i].value
     return(state)
 
-def hand_from_state(state):
-    gen_hand = deck_actions.Hand()
-    if state[6] == [1, 1]:
-        gen_hand.isdeal = True
-    for i in range(4):
-        gen_hand.hand = gen_hand.hand + [deck_actions.Card(state[i][0], state[i][1])]
-        #print(state[i][0], state[i][1])
-    for i in range(2):
-        gen_hand.cribbed = gen_hand.cribbed + [[deck_actions.Card(state[i + 4][0], state[i + 4][1])]]
-        #print(state[i + 4][0], state[i + 4][1])
-    return(gen_hand)
-
 def state_flatten(state):
     return(np.array(state).flatten())
-
-def state_unflatten(flat_state):
-    state = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-    for i in range(6):
-        state[i] = [flat_state[2*i], flat_state[2*i + 1]]
-    return(state)    
 
 #copying from cartpole program to do the q learning
 plotting = []
@@ -78,40 +78,35 @@ plotting = []
 # #policy network:
 def OurModel(input_shape, action_space):
     X_input = Input(input_shape)
-
     # 'Dense' is the basic form of a neural network layer
     # Input Layer of state size(?) and Hidden Layer with 512 nodes
     X = Dense(512, input_shape=input_shape, activation="relu", kernel_initializer='he_uniform')(X_input)
-
     # Hidden layer with 256 nodes
     X = Dense(256, activation="relu", kernel_initializer='he_uniform')(X)
-
     # Hidden layer with 64 nodes
     X = Dense(64, activation="relu", kernel_initializer='he_uniform')(X)
-
     # Output Layer with # of actions: 15 nodes
     X = Dense(action_space, activation="linear", kernel_initializer='he_uniform')(X)
 
     model = Model(inputs=X_input, outputs=X, name='cribbage_score_model')
-    model.compile(loss="mse", optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01), metrics=["accuracy"])
+    model.compile(loss="mse", optimizer=RMSprop(learning_rate=0.00025, rho=0.95, epsilon=0.01), metrics=["accuracy"])
 
     # model.summary()
     return model
-
 
 class DQNAgent:
     def __init__(self):
 
         self.state_size = 7 
         self.action_size = 15 
-        self.EPISODES = 1000
+        self.EPISODES = 50000
         self.memory = deque(maxlen=40000)
         self.gamma = 1  # discount rate (no discounting here - quick hands, no benefit to speed)
-        self.epsilon = 0.9
+        self.epsilon = 0.999
         self.epsilon_min = 0.001
-        self.epsilon_decay = 0.999
+        self.epsilon_decay = 10000 #0.999 #play with this number - more chances to take random actions when larger
         self.batch_size = 64
-        self.train_start = 20000
+        self.train_start = 4000000
 
         # create main model
         self.model = OurModel(input_shape=(self.state_size,), action_space=self.action_size)
@@ -128,23 +123,21 @@ class DQNAgent:
         state = get_score_state_nosuit(hand_state)
         state_for_model = state_flatten(state)
         sample = random.random()
+        print(sample)
         eps_threshold = self.epsilon_min + (self.epsilon - self.epsilon_min) * \
                         math.exp(-1. * len(self.memory) / self.epsilon_decay) 
-        #this is the prediction part... leaving blank because I don't know how it works. 
-        #i will have it permanently do the random policy until i'm finished with general structure
+        print(eps_threshold)
         if sample > eps_threshold: 
-            # random_act = random_discard_action_qlearn()
-            # crib.dealt(discard_function(random_act,hand_state))
             state_for_model = tensorflow.reshape(state_for_model,shape=(1,self.state_size))
             action_to_take = np.zeros(15)
             action_to_take[np.argmax(self.model.predict([state_for_model]))] = 1
             crib.dealt(discard_function(action_to_take,hand_state))
-            print(action_to_take)
             return (action_to_take)
 
         else: #implement the random policy to pick any two cards
             random_act = random_discard_action_qlearn()
             crib.dealt(discard_function(random_act,hand_state))
+            print('random action')
             return (random_act)
 
     # implement the Q-learning
@@ -214,7 +207,9 @@ class DQNAgent:
             P = deck_actions.Peg_pile() #peg pile init
             P.playlast = 1
             H.dealt(D.deal(6))
+            H.order()
             V.dealt(D.deal(6))    
+            V.order()
             C.dealt(random_discard_policy(V))
 
             state = get_score_state_nosuit(H)
@@ -237,7 +232,6 @@ class DQNAgent:
                 #next_state = get_score_state(H)
                 next_state = get_score_state_nosuit(H)
                 # print(next_state) next state not important here
-
                 # #scoring the final hands
                 opscore = opscore + cribbage_scoring.score_hand(V.hand + cut_card)
                 score = score + cribbage_scoring.score_hand(H.hand + cut_card)
@@ -247,7 +241,7 @@ class DQNAgent:
                     opscore = opscore + cribbage_scoring.score_hand(C.hand + cut_card)
                 reward = score
                 done = True
-
+                print(state, action, reward, next_state, done)
                 self.remember(state, action, reward, next_state, done)
                 #state = next_state
 
@@ -295,7 +289,10 @@ if __name__ == "__main__":
     # agent.test()
 
 plt.plot(plotting)
-plt.title('Score vs. number of attempts')
+plt.title('Score vs. number of attempt: random policy')
 plt.xlabel('Number of training sessions')
 plt.ylabel('Score')
 plt.show()
+
+print(np.mean(plotting[:1000]))
+print(np.mean(plotting[-1000:]))
