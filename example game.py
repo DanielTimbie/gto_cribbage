@@ -107,7 +107,7 @@ while len(P.pile) < 8:
             opscore = opscore + cribbage_scoring.score_peg(P)
             P.playlast = 1
             if P.pileval == 31:
-                H.isgo, V.isgo = True, True                 
+                H.isgo, V.isgo = True, True  
             
     if P.playlast == 0 and P.pileval != 31:
         #print('last card +1 for Hero')
