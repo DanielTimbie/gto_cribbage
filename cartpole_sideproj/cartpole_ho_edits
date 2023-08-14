@@ -46,7 +46,7 @@ class DQNAgent:
         # print('meowmeowmow')
         # print(self.state_size)
         # print(self.action_size)
-        self.EPISODES = 5
+        self.EPISODES = 10
         self.memory = deque(maxlen=2000)
 
         self.gamma = 0.95  # discount rate
@@ -73,9 +73,8 @@ class DQNAgent:
                         math.exp(-1. * len(self.memory) / self.epsilon_decay)
         if sample > eps_threshold:
             action_to_take = np.argmax(self.model.predict(state))
-            print('mew')
-            print(state)
-            print(self.model.predict(state))
+            # print(state)
+            # print(self.model.predict(state))
             #print('selected optimal action')
             # ^ supposed to find the max reward in the list of past rewards for current state
             # then find what index it is, and then select the action from the max reward
@@ -117,7 +116,13 @@ class DQNAgent:
             # correction on the Q value for the action used,
             # if done[i] is true, then the target should be just the final reward
             if done[i]:
+                # print('here')
+                print(target)
+                print(action)
+                # print(reward[i])
+                # print(target[i][action[i]])
                 target[i][action[i]] = reward[i]
+                # print(target[i][action[i]])
 
             else:
                 target[i][action[i]] = reward[i] + self.gamma * np.max(target_next[i])

@@ -21,12 +21,45 @@ def random_play_policy(hand, pile):
                 pile.add_card(hand.hand[selector])
                 hand.hand[selector].isused = True
                 # print(hand.hand[selector].value)
-                break
-
+                retstate = [0,0,0,0]
+                retstate[selector] = 1
+                return(retstate)
+    
     if tcounter == [1, 1, 1, 1]:
             hand.isgo = True
             # print('go!')
 
+def play_function(hand, pile, play_act):
+     tcounter = [0, 0, 0, 0]
+     first_act = True
+     while tcounter != [1, 1, 1, 1]:
+               if first_act == True:
+                    selector = np.argmax(play_act)
+               else:
+                    selector = random.randint(0,3)
+               val = hand.hand[selector].value
+               first_act = False
+               if val >=10:
+                    val = 10
+               if pile.pileval + val > 31:
+                    tcounter[selector] = 1
+               elif hand.hand[selector].isused == True:
+                    tcounter[selector] = 1
+               elif pile.pileval + val <= 31 and hand.hand[selector].isused == False:
+                    pile.add_card(hand.hand[selector])
+                    hand.hand[selector].isused = True
+                    # print(hand.hand[selector].value)
+                    retstate = [0,0,0,0]
+                    retstate[selector] = 1
+                    return(retstate)
+    
+     if tcounter == [1, 1, 1, 1]:
+               hand.isgo = True
+               return([0,0,0,0])
+               # print('go!')
+
+     
+     
 #function to discard two random cards
 def random_discard_policy(hand):
     discards = []

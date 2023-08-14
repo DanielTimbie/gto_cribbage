@@ -37,39 +37,17 @@ from preset_policy import *
 #         state[i] = [flat_state[2*i], flat_state[2*i + 1]]
 #     return(state)    
 
-#state with collapsed suit and value attributes
-def get_score_state(hand):
-    #first eight for value, final four cribbed
-    state = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-    if hand.isdeal == True:
-        state[6] = [1, 1]
-    if hand.cribbed == []:
-        for i in range(0,6):
-            state[i][0] = hand.hand[i].value
-            state[i][1] = hand.hand[i].suit
-    else:
-        for i in range(0,4):
-            state[i][0] = hand.hand[i].value
-            state[i][1] = hand.hand[i].suit
-        for i in range(0,2):
-            state[i + 4][0] = hand.cribbed[i].value
-            state[i + 4][1] = hand.cribbed[i].suit
-    return(state)
-
-def get_score_state_nosuit(hand):
-    #temporary function for scoring
-    state = [0, 0, 0, 0, 0, 0, 0]
-    if hand.isdeal == True:
-        state[6] = 1
-    if hand.cribbed == []:
-        for i in range(0,6):
+def get_play_state(hand, cutcard, score, optscore, pile):
+    #first four for hand cards, last six for pile data
+    state = [0, 0, 0, 0, cutcard[0].value, 0, score, optscore, 0, 0, 0, 0, 0, 0, 0, 0]
+    for i in range(0,4):
+        if hand.hand[i].isused == False:
             state[i] = hand.hand[i].value
-    else:
-        for i in range(0,4):
-            state[i] = hand.hand[i].value
-        for i in range(0,2):
-            state[i + 4] = hand.cribbed[i].value
-    return(state)
+    if hand.isdeal == True:
+        state[5] = 1
+    for i in range(0,len(pile.pile)):
+        state[8+i] = pile.pile[i]
+    return state
 
 def state_flatten(state):
     return(np.array(state).flatten())
@@ -88,7 +66,7 @@ def OurModel(input_shape, action_space):
     X = Dense(256, activation="relu", kernel_initializer='he_uniform')(X)
     # Hidden layer with 64 nodes
     X = Dense(64, activation="relu", kernel_initializer='he_uniform')(X)
-    # Output Layer with # of actions: 15 nodes
+    # Output Layer with # of actions: 4 nodes
     X = Dense(action_space, activation="linear", kernel_initializer='he_uniform')(X)
 
     model = Model(inputs=X_input, outputs=X, name='cribbage_score_model')
@@ -100,9 +78,9 @@ def OurModel(input_shape, action_space):
 class DQNAgent:
     def __init__(self):
 
-        self.state_size = 7 
-        self.action_size = 15 
-        self.EPISODES = 5000
+        self.state_size = 16 
+        self.action_size = 4 
+        self.EPISODES = 50
         self.hands_per_ep = 10
         self.memory = deque(maxlen=500000)
         self.gamma = 1  # discount rate (no discounting here - quick hands, no benefit to speed)
@@ -110,7 +88,7 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.9999 #0.99995# 0.999
         self.batch_size = 64
-        self.train_start = 1000
+        self.train_start = 200
 
         # create main model
         self.model = OurModel(input_shape=(self.state_size,), action_space=self.action_size)
@@ -122,30 +100,26 @@ class DQNAgent:
             epsplot = epsplot + [self.epsilon]
             if self.epsilon > self.epsilon_min:
                 self.epsilon *= self.epsilon_decay
-            
 
     # implement the epsilon-greedy policy
-    def act(self, hand_state, crib):
-        #state = get_score_state(hand_state)
-        state = get_score_state_nosuit(hand_state)
+    def act(self, hand, cut, score, opscore, pile):
+        state = get_play_state(hand, cut, score, opscore, pile)
         state_for_model = state_flatten(state)
         sample = random.random()
         eps_threshold = self.epsilon_min + (self.epsilon - self.epsilon_min) * \
                         math.exp(-1. * len(self.memory) / self.epsilon_decay) 
+        print('acting')
         if sample > eps_threshold: 
+            print('acting calculated')
+            state_for_model = get_play_state(hand, cut, score, opscore, pile)
             state_for_model = tensorflow.reshape(state_for_model,shape=(1,self.state_size))
-            action_to_take = np.zeros(15)
+            action_to_take = np.zeros(4)
             action_to_take[np.argmax(self.model.predict([state_for_model]))] = 1
-            crib.dealt(discard_function(action_to_take,hand_state))
-            # print('calculated:')
-            # print(action_to_take)
             return (action_to_take)
 
         else: #implement the random policy to pick any two cards
-            random_act = random_discard_action_qlearn()
-            crib.dealt(discard_function(random_act,hand_state))
-            # print('random action')
-            # print(random_act)
+            print('acting random')
+            random_act = random_play_policy(hand,pile)
             return (random_act)
 
     # implement the Q-learning
@@ -223,58 +197,75 @@ class DQNAgent:
                 V.dealt(D.deal(6))    
                 V.order()
                 C.dealt(random_discard_policy(V))
+                C.dealt(random_discard_policy(H))
 
-                state = get_score_state_nosuit(H)
+                # state = get_score_state_nosuit(H)
                 # print(H.hand)
                 # print(state)
                 cut_card = D.deal(1)
 
-                #score for jack on turn for dealer
-                if cut_card[0].value == 11:
-                    if H.isdeal == True:
+                done = False 
+
+                i = 0 
+                while not done:
+                    while H.isgo == False or V.isgo == False:  
+                        if (H.isgo == False and P.playlast == 1) or (V.isgo == True and P.playlast == 0):
+                            
+                            prevscore = score
+                            state = get_play_state(H, cut_card, score, opscore, P) #finds the state
+                            
+                            action = self.act(H, cut_card, score, opscore, P)
+                            action = play_function(H, P, action)
+                            print(action)
+
+                            score = score + cribbage_scoring.score_peg(P)
+
+                            next_state = get_play_state(H, cut_card, score, opscore, P) #finds the next state
+                            reward = score - prevscore
+                            # if H.isgo == False:
+                            self.remember(state, action, reward, next_state, done)
+
+                            P.playlast = 0
+                            if P.pileval == 31:
+                                H.isgo, V.isgo = True, True
+                        if (V.isgo == False and P.playlast == 0) or (H.isgo == True and P.playlast == 1):
+                            random_play_policy(V,P) 
+                            opscore = opscore + cribbage_scoring.score_peg(P)
+                            P.playlast = 1
+                        if P.pileval == 31:
+                            H.isgo, V.isgo = True, True   
+
+                    if P.playlast == 0 and P.pileval != 31:
+                        #print('last card +1 for Hero')
                         score += 1
-                    if V.isdeal == True:
+
+                    if P.playlast == 1 and P.pileval != 31:
+                        #print('last card +1 for Villain')
                         opscore += 1
 
-                done = False #only one step for each of these... to be expanded on...
+                    P.pileval = 0
+                    P.resetct = len(P.pile)
+                    H.isgo, V.isgo = False, False
 
-                i = 0 #really only running once, but keep this format for future complexity
-                while not done:
-                    action = self.act(H,C) 
-                    #next_state = get_score_state(H)
-                    next_state = get_score_state_nosuit(H)
-                    # print(next_state) next state not important here
-                    # #scoring the final hands
-                    opscore = opscore + cribbage_scoring.score_hand(V.hand + cut_card)
-                    score = score + cribbage_scoring.score_hand(H.hand + cut_card)
-                    if (counter % 2) == 0:
-                        score = score + cribbage_scoring.score_hand(C.hand + cut_card)
-                    else:
-                        opscore = opscore + cribbage_scoring.score_hand(C.hand + cut_card)
-                    reward = score
-                    done = True
-                    #print(state, action, reward, next_state, done)
-                    self.remember(state, action, reward, next_state, done)
-                    #state = next_state
+                    i += 1
 
-                    #i += 1   <--- previously used to reward longer sessions, now undesired. temp: i = reward
-                    i = reward 
+                    if len(P.pile) >= 8:
+                        done = True
 
                     if done and (runs + 1) == self.hands_per_ep:
                         dateTimeObj = datetime.now()
                         timestampStr = dateTimeObj.strftime("%H:%M:%S")
-                        print("episode: {}/{}, score: {}, e: {:.2}, time: {}".format(counter + 1, self.EPISODES, i, self.epsilon,
+                        print("episode: {}/{}, score: {}, e: {:.2}, time: {}".format(counter + 1, self.EPISODES, score, self.epsilon,
                                                                                     timestampStr))
-                        plotting = plotting + [i]
+                        plotting = plotting + [score]
                         # save model option
                         # if i >= 500:
                         #     print("Saving trained model as cribbage_discard_training.h5")
                         #     self.save("./save/cribbage_discard_training.h5")
                         #     return # remark this line if you want to train the model longer
 
-                    runs += 1
+                runs += 1
                 print(counter)
-                print(runs)
                 self.replay()
             counter += 1
 
@@ -304,25 +295,25 @@ if __name__ == "__main__":
     # print(agent.memory)
     # agent.test()
 
-def linearfit(x, slope, intercept):
-    yret = slope*x + intercept
-    return(yret)
+# def linearfit(x, slope, intercept):
+#     yret = slope*x + intercept
+#     return(yret)
 
-x = np.arange(0,len(plotting))
-slope, intercept, r_value, p_value, std_err = stats.linregress(x, plotting)
+# x = np.arange(0,len(plotting))
+# slope, intercept, r_value, p_value, std_err = stats.linregress(x, plotting)
 
-window = 100
-average_data = []
-for ind in range(len(plotting) - window + 1):
-    average_data.append(np.mean(plotting[ind:ind+window]))
-for ind in range(window - 1):
-    average_data.insert(0, np.nan)
+# window = 100
+# average_data = []
+# for ind in range(len(plotting) - window + 1):
+#     average_data.append(np.mean(plotting[ind:ind+window]))
+# for ind in range(window - 1):
+#     average_data.insert(0, np.nan)
 
 plt.plot(plotting)
-plt.plot(x, average_data)
-print('slope:')
-print(slope)
-plt.plot(x,linearfit(x, slope, intercept))
+# plt.plot(x, average_data)
+# print('slope:')
+# print(slope)
+# plt.plot(x,linearfit(x, slope, intercept))
 plt.title('Score vs. number of attempt')
 plt.xlabel('Number of training sessions')
 plt.ylabel('Score')
