@@ -44,11 +44,11 @@ def get_score_state(hand):
     if hand.isdeal == True:
         state[6] = [1, 1]
     if hand.cribbed == []:
-        for i in range(0,6):
+        for i in range(0,6): 
             state[i][0] = hand.hand[i].value
             state[i][1] = hand.hand[i].suit
     else:
-        for i in range(0,4):
+        for i in range(0,4): 
             state[i][0] = hand.hand[i].value
             state[i][1] = hand.hand[i].suit
         for i in range(0,2):
@@ -323,7 +323,7 @@ plt.plot(x, average_data)
 print('slope:')
 print(slope)
 plt.plot(x,linearfit(x, slope, intercept))
-plt.title('Score vs. number of attempt')
+plt.title('Score vs. number of attempts')
 plt.xlabel('Number of training sessions')
 plt.ylabel('Score')
 plt.show()
@@ -331,7 +331,7 @@ plt.show()
 plt.plot(epsplot)
 plt.title('Epsilon value vs. number of training sessions')
 plt.xlabel('Number of training sessions')
-plt.ylabel('Epsilon value')
+plt.ylabel('Epsilon vaue')
 plt.show()
 
 print(np.mean(plotting[:100]))
